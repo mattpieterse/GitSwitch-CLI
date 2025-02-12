@@ -13,6 +13,23 @@ param(
 
 # -- Functions
 
+function Test-GitInstallation {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param()
+
+    # Check if git is installed
+    try {
+        # Validate by running the git command
+        $null = git --version
+        return $true
+    }
+    catch {
+        Write-Error("Git is not installed or not in PATH: $_")
+        return $false
+    }
+}
+
 function Get-GitConfig {
     [CmdletBinding()]
     [OutputType([hashtable])]
