@@ -70,7 +70,7 @@ function Get-GitConfig {
     # Try parsing the configuration file
     try {
         # Load the configuration file
-        $configPath = Join-Path($PSScriptRoot, 'config.json')
+        $configPath = Join-Path -Path $PSScriptRoot -ChildPath 'config.json'
         if (-not (Test-Path($configPath))) {
             throw "Configuration file not found: $configPath"
         }
