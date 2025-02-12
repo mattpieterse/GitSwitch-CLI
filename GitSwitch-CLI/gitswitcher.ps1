@@ -30,6 +30,38 @@ function Test-GitInstallation {
     }
 }
 
+function Show-CurrentConfig {
+    [CmdletBinding()]
+    param()
+
+    try {
+        Write-Host("`nCurrent Git Configuration:") -ForegroundColor Green
+        Write-Host("------------------------") -ForegroundColor Green
+        
+        $configKeys = @('user.name', 'user.email', 'user.signingkey')
+        foreach ($key in $configKeys) {
+            $value = git config --global $key
+            Write-Host("$key`: $value")
+        }
+
+        Write-Host("`nTesting SSH connection for $Account profile...") -ForegroundColor Yellow
+        $sshCommand = "ssh -T git@github.com-$Account 2>&1"
+        $sshOutput = Invoke-Expression($sshCommand)
+
+        # GitHub's success message contains this specific text
+        if ($sshOutput -match "successfully authenticated") {
+            Write-Host("SSH connection successful!") -ForegroundColor Green
+            return $true
+        } else {
+            throw ("SSH authentication failed: $sshOutput")
+        }
+    }
+    catch {
+        Write-Error("Failed to display configuration: $_")
+        return $false
+    }
+}
+
 function Get-GitConfig {
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -109,4 +141,29 @@ function Set-GitConfig {
     }
 
     return $true
+}
+
+# -- Execution
+
+try {
+    $config = Get-GitConfig
+    if (-not $config) {
+        throw ("Configuration initialization failed")
+    }
+
+    if (-not (Test-GitInstallation)) {
+        throw ("Git installation check failed")
+    }
+
+    if (-not (Set-GitConfig -Account $Account)) {
+        throw ("Git configuration failed")
+    }
+
+    if (-not (Show-CurrentConfig)) {
+        throw ("Failed to verify configuration")
+    }
+}
+catch {
+    Write-Error("Script execution failed: $_")
+    exit 1
 }
