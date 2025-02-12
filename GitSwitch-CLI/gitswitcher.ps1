@@ -10,3 +10,86 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Account
 )
+
+# -- Functions
+
+function Get-GitConfig {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param()
+
+    # Try parsing the configuration file
+    try {
+        # Load the configuration file
+        $configPath = Join-Path($PSScriptRoot, 'config.json')
+        if (-not (Test-Path($configPath))) {
+            throw "Configuration file not found: $configPath"
+        }
+
+        $configFile = Get-Content $configPath -Raw | ConvertFrom-Json
+
+        # Convert JSON to HashTable
+        $Script:GitConfigs = @{}
+        foreach ($entity in $configFile.accounts.PSObject.Properties) {
+            $config = @{}
+
+            # Validate the schema of the configuration file
+            foreach ($field in @('name', 'email', 'signingKey', 'sshCommand')) {
+                if (-not ($entity.Value.$field)) {
+                    throw "The required field '$($entity.Name)/$field' is missing from the configuration file."
+                }
+
+                $config[$field] = $entity.Value.$field
+            }
+
+            # Add the configuration to the global variables
+            $Script:GitConfigs[$entity.Name] = $config
+        }
+
+        # Validate parameters against the configuration
+        if (-not ($Script:GitConfigs.ContainsKey($Account))) {
+            throw "The account '$Account' does not exist in the configuration file."
+        }
+
+        return $Script:GitConfigs
+    }
+    catch {
+        Write-Error("Failed to initialize configuration: $_")
+        return $null
+    }
+}
+
+function Set-GitConfig {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Account
+    )
+    
+    try {
+        $config = $Script:GitConfigs[$Account]
+        $gitConfig = @(
+            @{ Key = 'user.name'; Value = $config.name }
+            @{ Key = 'user.email'; Value = $config.email }
+            @{ Key = 'user.signingkey'; Value = $config.signingKey }
+            @{ Key = 'core.sshCommand'; Value = $config.sshCommand }
+            @{ Key = 'commit.gpgsign'; Value = 'true' }
+            @{ Key = 'gpg.format'; Value = 'ssh' }
+        )
+
+        foreach ($cfg in $gitConfig) {
+            git config --global $cfg.Key $cfg.Value
+
+            # Check if the command was successful
+            if ($LASTEXITCODE -ne 0) {
+                throw ("Git configuration failed: $($cfg.Key)")
+            }
+        }
+    }
+    catch {
+        Write-Error("Git configuration failed: $_")
+        return $false
+    }
+
+    return $true
+}
