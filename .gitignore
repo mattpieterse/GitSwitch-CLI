@@ -1,2 +1,2 @@
-# Ignore the development script
-*.dev*
+# Ignore development entities
+*.json
